@@ -38,7 +38,7 @@ typedef struct particle
 
 void main()
 {
-	/* Q1a Generating P(τ)dτ = exp(−τ)dτ distribution
+	/* Q1a Generating P(τ)dτ = exp(−τ)dτ distribution vars
 	-------------------------------------------------*/
 	int N = 1e6; // number of deviates to generate
 	int x0 = 0; // x0 and x1 used to define domain pdf is sampled in
@@ -51,8 +51,34 @@ void main()
 	double norm_factor = x1-x0;
 	int i = 0;
 	int num_rejected = 0;
-	
-	/* Rejection method
+	/* Q1b Monte Carlo isotropic scattering vars
+	----------------------------------------- */
+	double tau,step_size;
+	struct particle photon; 
+	double z_min = 0;
+	double z_max = 1;
+	double alpha = 10;
+ 	double albedo = 1;
+	int num_photons_simulated = 0;
+	int num_photons_escaped = 0;
+	int total_escaped = 1e6;
+	double dtheta = 90. / N_BINS_ISOTROPIC; // in degrees
+	double dcostheta = 1. / N_BINS_ISOTROPIC;
+	bool absorb_photon = false;
+	int binned_theta_isotropic[N_BINS_ISOTROPIC];
+	int binned_cos_theta_isotropic[N_BINS_ISOTROPIC];
+	int theta_bin, costheta_bin;
+	double random_number;
+	/*q1c Monte carlo photon rayleigh scattering vars
+	---------------------------------------------- */
+	int binned_cos_theta_rayleigh[N_BINS_RAYLEIGH];
+	int binned_theta_rayleigh[N_BINS_RAYLEIGH];
+	double alphas[1] = {0.1};
+	double rel_theta, rel_phi;
+	int angle_counter = 0;
+	int iteration;
+
+	/* Q1a Rejection method
 	----------------------*/
 	// start clock for method
 	clock_t t;
@@ -120,36 +146,14 @@ void main()
 	printf("Finished sampling %d points via cumulative mapping method in %lfs\n",N, time_taken);
 
  	/* Q1b Monte Carlo isotropic scattering
-	----------------------------------------- */
-	double tau,step_size;
-	struct particle photon; 
-	double z_min = 0;
-	double z_max = 1;
-	double alpha = 10;
- 	double albedo = 1;
-	int num_photons_simulated = 0;
-	int num_photons_escaped = 0;
-	int total_escaped = 1e6;
-	double dtheta = 90. / N_BINS_ISOTROPIC; // in degrees
-	double dcostheta = 1. / N_BINS_ISOTROPIC;
-	bool absorb_photon = false;
-	int binned_theta_isotropic[N_BINS_ISOTROPIC];
-	int binned_cos_theta_isotropic[N_BINS_ISOTROPIC];
-	int theta_bin, costheta_bin;
-	double random_number;
-	
+	----------------------------------------- */	
 	// clear out the bins first
 	for (int i = 0; i < N_BINS_ISOTROPIC; i++)
 		{
 			binned_theta_isotropic[i] = 0;
 			binned_cos_theta_isotropic[i] = 0;
 		}
-	
-	// file to store scattered angles and check if angles are isotropic
-	int angle_counter = 0;
-	FILE *pf2;
-	pf2 = fopen("theta_vals.txt","w+");
-	
+	/*
 	// run MC simulation
 	printf("[INFO] Starting MC simulation of isotropic elastic scattering of %d photons\n",total_escaped);
 	while (num_photons_escaped != total_escaped)
@@ -204,7 +208,6 @@ void main()
 			binned_theta_isotropic[theta_bin]++;
 			costheta_bin = (int) (cos(photon.theta) / dcostheta);
 			binned_cos_theta_isotropic[costheta_bin]++;
-			fprintf(pf2,"%lf\n",photon.theta);
 			printf("\r%i/%i photons made it through!",num_photons_escaped,total_escaped);
 		}
 
@@ -216,36 +219,34 @@ void main()
 
 	// simulation finished
 	printf("\nFinished MC simulation of isotropic photon scattering! %i/%i photons made it through!\n",num_photons_escaped,num_photons_simulated);
-	
-	fclose(pf2); // close angle storing file
-	
+		
 	// save results to a txt file
 	char isotropic_photon_scattering_outfile[] = "isotropic_photon_scattering.txt";
 	pf = fopen(isotropic_photon_scattering_outfile, "w+");
 	for (int i = 0; i<N_BINS_ISOTROPIC; i++)
 	{
 		fprintf(pf,"%lf,%i,%lf,%i\n",i*dtheta,binned_theta_isotropic[i],i*dcostheta,binned_cos_theta_isotropic[i]);
-	}
+	}*/
 
-	/* q1c Monte carlo photon rayleigh scattering 
+	/*q1c Monte carlo photon rayleigh scattering 
 	---------------------------------------------- */
-	// define new vars and arrays for rayleigh scattering
-	/*
-	int binned_rayleigh[N_BINS_RAYLEIGH];
-	double alphas[2] = {10,0.1};
-	double rel_theta, rel_phi, y;
 	// reset counters, dtheta and absorb_photon vars
 	num_photons_simulated = 0;
 	num_photons_escaped = 0;
-	total_escaped = 1e5;
+	total_escaped = 1e1;
 	absorb_photon = false;
 	dtheta = 90. / N_BINS_RAYLEIGH; // in degrees
+	dcostheta = 1. / N_BINS_RAYLEIGH;
 
 	// loop over photon types
 	for (int num_photon_type = 0; num_photon_type < 2; num_photon_type++)
 	{
 		// reset the theta bins and counters 
-		for (int i = 0; i < N_BINS_RAYLEIGH; i++) binned_rayleigh[i] = 0;
+		for (int i = 0; i < N_BINS_RAYLEIGH; i++) 
+		{
+			binned_cos_theta_rayleigh[i] = 0;
+			binned_theta_rayleigh[i] = 0;
+		}
 		num_photons_simulated = 0;
 		num_photons_escaped = 0;
 		angle_counter = 0;
@@ -256,7 +257,7 @@ void main()
 		snprintf(outfile_angles, sizeof outfile_angles, "rayleigh_scattering_angles_%d.txt", num_photon_type);
 		pf2 = fopen(outfile_angles,"w+");
 
-		printf("[INFO] simulating photon type %d:\n",num_photon_type);
+		printf("\n[INFO] simulating photon type %d:\n",num_photon_type);
 		
 		// run MC simulation for photon type
 		alpha = alphas[num_photon_type];
@@ -270,12 +271,12 @@ void main()
 
 			photon.theta = 0.;
 			photon.phi = 2*M_PI*gen_uniform_deviate(a,c,m) - M_PI; 
-			int iteration = 1;
+			iteration = 0;
 			
 			// scatter photon till it escapes atmosphere or gets absorbed
 			while ((photon.z >= 0) && (photon.z <= 1) && (absorb_photon != true))
 				{	
-					// printf("photon.z %lf\n",photon.z);
+					iteration++;
 					// check if photon is absorbed
 					random_number = gen_uniform_deviate(a,c,m);
 					if (random_number > albedo) absorb_photon = true;
@@ -284,20 +285,24 @@ void main()
 					else if (iteration > 1 && absorb_photon != true)
 						{
 							// draw rel phi at random 
-							rel_phi = 2*M_PI*gen_uniform_deviate(a,c,m) - M_PI; 
+							rel_phi = 2 * M_PI * gen_uniform_deviate(a,c,m) - M_PI; 
 							// draw rel theta via rejection method
 							rel_theta = acos(2*gen_uniform_deviate(a,c,m) - 1);
+							printf("\ndrawn rel_theta: %lf rel_phi: %lf \n",rel_theta, rel_phi);
 							y = (3/8*M_PI)*gen_uniform_deviate(a,c,m);
 							while (y>rayleigh_phase_func(rel_theta))
 							{
 								rel_theta = acos(2*gen_uniform_deviate(a,c,m) - 1);
-								y = 2*gen_uniform_deviate(a,c,m);
+								y = (3/8*M_PI)*gen_uniform_deviate(a,c,m);
+							}
+							if (angle_counter<N)
+							{
+								fprintf(pf2,"%lf,%lf\n",rel_theta, rel_phi);
+								angle_counter++;
 							}
 							
 							// transform relative angles back to lab frame
-							rotate_back_to_lab(&photon.theta, &photon.phi, rel_theta, rel_phi);
-														
-
+							rotate_back_to_lab(&photon.theta, &photon.phi, rel_theta, rel_phi);					
 						}
 					
 					// draw tau value
@@ -310,18 +315,12 @@ void main()
 					if (absorb_photon != true)
 					{
 						// store the angles
-						if (angle_counter<N)
-							{
-								fprintf(pf2,"%lf,%lf\n",photon.theta, photon.phi);
-								angle_counter++;
-							}
 						step_size = tau / alpha;
 						photon.x += step_size * sin(photon.theta) * cos(photon.phi);
 						photon.y += step_size * sin(photon.theta) * sin(photon.phi);
 						photon.z += step_size * cos(photon.theta);
 					}
 
-					iteration++;
 				}
 
 			// escaped in the right direction?
@@ -329,14 +328,17 @@ void main()
 				{
 					// log escaped photon and bin theta val
 					num_photons_escaped++;
-					i_bin = (int) ((photon.theta * 180 / M_PI) ) / dtheta;
-					// printf("theta:%lf, bin:%d\n",photon.theta*180/M_PI,i_bin);
-					binned_rayleigh[i_bin]++;
+					theta_bin = (int) ((photon.theta * 180 / M_PI) / dtheta);
+					binned_theta_rayleigh[theta_bin]++;
+					costheta_bin = (int) (cos(photon.theta) / dcostheta);
+					binned_cos_theta_rayleigh[costheta_bin]++;
+					printf("iteration: %i tau:%lf rel_theta:%lf, rel_phi:%lf theta:%lf phi:%lf theta_bin:%i cos_theta:%lf cos_theta_bin:%i\n",iteration,tau, rel_theta, rel_phi, photon.theta,photon.phi, theta_bin, cos(photon.theta), costheta_bin);
+					printf("\r%i/%i type %i photons made it through!",num_photons_escaped,total_escaped,num_photon_type);
+
 				}	
 			
 			// log simulated photon
 			num_photons_simulated++;
-			// printf("\r%i/%i photons made it through!\n",num_photons_escaped,total_escaped);
 			fflush(stdout);
 		}
 	
@@ -344,11 +346,16 @@ void main()
 		char outfile[1024]; 
 		snprintf(outfile, sizeof outfile, "rayleigh_scattering_%d.txt", num_photon_type);
 		pf = fopen(outfile, "w+");
-		for (int i = 0; i<N_BINS_RAYLEIGH; i++) fprintf(pf,"%lf, %i\n",i*dtheta +dtheta/2,binned_rayleigh[i]);
+		
+		for (int i = 0; i<N_BINS_RAYLEIGH; i++) 	
+		{
+			fprintf(pf,"%lf,%i,%lf,%i\n",i*dtheta,binned_theta_rayleigh[i],i*dcostheta,binned_cos_theta_rayleigh[i]);
+		}
+
 		fclose(pf);
 		fclose(pf2);
 	}
-	*/
+	
 }
 
 double gen_uniform_deviate(int a, int c, long int m)
@@ -393,13 +400,13 @@ void rotate_back_to_lab(double *theta, double *phi, double rel_theta, double rel
 	double p_rel[3][1] = {{rel_photon.x},{rel_photon.y},{rel_photon.z}}; 
 	double p_lab[3][1]; 
 	
-	// align z axis with z'
+	// define rotation matrices to transform rel coordinates to lab coordinates
 	init_Ry(Ry,(*theta)); 
 	if (fabs(*theta) > EPS) init_Rz(Rz,(*phi));
 	else init_Rz(Rz,0); // if theta = 0, set phi to 0 (rotation about z unecessary if theta=0)
 
 	// Combine rotation matrices and apply
-	matmul(3,3,3,Rz,Ry,R);
+	matmul(3,3,3,Ry,Rz,R);
 	matmul(3,3,1,R,p_rel,p_lab);
 
 	// update theta and phi vals for photon
@@ -407,6 +414,7 @@ void rotate_back_to_lab(double *theta, double *phi, double rel_theta, double rel
 	*theta = acos(p_lab[2][0]/r);
 	*phi = atan2(p_lab[1][0],p_lab[0][0]); 
 }
+
 void init_Rz(double Rz[3][3], double theta)
 {
 	// define a rotation matrix to rotate points about z axis by theta degrees ACW
